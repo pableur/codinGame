@@ -7,8 +7,28 @@ TYPE_OP_HERO = 2
 
 TARGET_TIME_MAX = 10
 
+SPELL_WIND = "SPELL WIND"
+
 def debug(txt):
     print(txt, file=sys.stderr, flush=True)
+
+
+def calc_wind_pos(pos_base, pos_hero, pos_monstre):
+    pos_wind = Pos(0,0)
+    distance = pos_hero - pos_base
+    facteur_norme = 2200/distance
+    debug(f"base {pos_base} hero {pos_hero} facteur_norme {facteur_norme}")
+    if pos_hero.x>pos_base.x:
+        pos_wind.x = (pos_hero.x-pos_base.x)*facteur_norme+pos_hero.x
+        pos_wind.y = (pos_hero.y-pos_base.y)*facteur_norme+pos_hero.y
+    else:
+        pos_wind.x = pos_hero.x-(pos_base.x-pos_hero.x)*facteur_norme
+        pos_wind.y = pos_hero.y-(pos_base.y-pos_hero.y)*facteur_norme
+    pos_wind.x = int(pos_wind.x )
+    pos_wind.y = int(pos_wind.y )
+    return pos_wind
+
+
 class Vector:
     def __init__(self, x, y):
         self.x = x
@@ -20,12 +40,17 @@ class Pos:
         self.y = y
 
     def __str__(self):
-        return self.x+" "+self.y
+        return f"{self.x} {self.y}"
+
+    def __repr__(self):
+        return f"{self.x} {self.y}"
 
     # retourne la distance entre deux points
     def __sub__(self, p2):
         hypo = pow(p2.x-self.x,2)+pow(p2.y-self.y,2)
         return math.sqrt(hypo)
+
+
 
 class Entity:
     def __init__(self, id, type, pos, shield_life, is_controlled, health, vector, near_base, threat_for):
@@ -76,16 +101,18 @@ class Entity:
 
 # base_x: The corner of the map representing your base
 base_x, base_y = [int(i) for i in input().split()]
+posMyBase = Pos(base_x, base_y )
 heroes_per_player = int(input())  # Always 3
 myHeroes = {}
 opHeroes = {}
 monstres = {}
 # game loop
 while True:
-    for i in range(2):
-        # health: Your base health
-        # mana: Ignore in the first league; Spend ten mana to cast a spell
-        health, mana = [int(j) for j in input().split()]
+    
+    # health: Your base health
+    # mana: Ignore in the first league; Spend ten mana to cast a spell
+    myHealth, myMana = [int(j) for j in input().split()]
+    ophealth, opMana = [int(j) for j in input().split()]
     entity_count = int(input())  # Amount of heros and monsters you can see
     for i in range(entity_count):
         # _id: Unique identifier
@@ -126,18 +153,28 @@ while True:
         if hero.target != None:
             debug(hero.target)
             target = monstres[hero.target]
-            if target.health>0:
-                action = f"MOVE {target.pos.x} {target.pos.y}"
-                target.targeted = True
-                if target.health<target.maxHealth:
-                    if hero.targetTime > target.health:
-                        hero.targetTime = target.health
-                    else:
-                        hero.targetTime-=2
-                    if hero.targetTime<=0:
-                        target.health = 0
-                        hero.target = None
-                        
+            if target.health>0 :
+                if (target.nearBase==1 and target.threatFor==1) or target.pos-posMyBase<7000:
+                    action = f"MOVE {target.pos.x} {target.pos.y}"
+                    target.targeted = True
+
+                    if target.pos-posMyBase<4000:
+                        if target.pos-hero.pos<1000:
+                            if myMana>10:
+                                wind_pos = calc_wind_pos(posMyBase, hero.pos, target.pos)
+                                action=f"{SPELL_WIND} {wind_pos}"
+
+                    if target.health<target.maxHealth:
+                        if hero.targetTime > target.health:
+                            hero.targetTime = target.health
+                        else:
+                            hero.targetTime-=2
+                        if hero.targetTime<=0:
+                            target.health = 0
+                            hero.target = None
+                else:
+                    hero.target = None
+                    target.targeted = False
             else:
                 hero.target = None
             print(f"Hero {hero.id} cible {hero.target}, vie {target.health} ", file=sys.stderr, flush=True)
